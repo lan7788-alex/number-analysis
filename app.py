@@ -192,46 +192,68 @@ if mode=="口径1取号":
             show_download("下载三不同",r["different"],f"{base}_三不同_{len(r['different'])}注.txt",f"k1d{i}")
 
 elif mode=="形态取号":
-    st.subheader("形态取号（按口径1八形态反筛法）")
-    st.caption("和口径1算法完全相同，只是不输入三位数字，直接指定大小母形态、奇偶母形态以及各自取位。")
+    st.subheader("形态取号（直接按给定形态筛选）")
+    st.caption("大小、奇偶形态数量可自由搭配。程序直接保留：大小形态在你给出的列表中，并且奇偶形态也在你给出的列表中的000-999组合。")
 
     with st.form("shape_pick"):
-        size_mother=st.selectbox("大小母形态", SIZE_SHAPES, key="shape_size_mother")
-        size_pos=st.selectbox("大小取位", ["百十","百个","十个"], key="shape_size_pos")
-        parity_mother=st.selectbox("奇偶母形态", PARITY_SHAPES, key="shape_parity_mother")
-        parity_pos=st.selectbox("奇偶取位", ["百十","百个","十个"], key="shape_parity_pos")
+        size_text=st.text_area(
+            "输入大小形态",
+            placeholder="大大大、大大小、大小大、小大大、大小小、小大小、小小大",
+            height=120
+        )
+        parity_text=st.text_area(
+            "输入奇偶形态",
+            placeholder="奇奇奇、奇奇偶、奇偶奇、偶奇奇、奇偶偶、偶奇偶、偶偶奇",
+            height=120
+        )
         go=st.form_submit_button("开始形态取号")
 
     if go:
-        r=run_shape_koujing1(size_mother,size_pos,parity_mother,parity_pos)
-        save_result(mode,{
-            "size_mother":size_mother,
-            "size_pos":size_pos,
-            "parity_mother":parity_mother,
-            "parity_pos":parity_pos,
-            "r":r
-        })
+        size_selected=[x for x in SIZE_SHAPES if x in (size_text or "")]
+        parity_selected=[x for x in PARITY_SHAPES if x in (parity_text or "")]
+
+        if not size_selected:
+            save_result(mode,{"error":"请至少输入1个有效的大小形态"})
+        elif not parity_selected:
+            save_result(mode,{"error":"请至少输入1个有效的奇偶形态"})
+        else:
+            full=[
+                n for n in ALL_NUMBERS
+                if size_shape(n) in size_selected
+                and parity_shape(n) in parity_selected
+            ]
+            same23=[n for n in full if repeat_type(n)!="三不同"]
+            different=[n for n in full if repeat_type(n)=="三不同"]
+            save_result(mode,{
+                "error":None,
+                "size_selected":size_selected,
+                "parity_selected":parity_selected,
+                "full":sorted(full),
+                "same23":sorted(same23),
+                "different":sorted(different)
+            })
 
     d=get_result(mode)
     if d:
-        r=d["r"]
-        st.divider()
-        st.markdown(f"## 大小 {d['size_mother']} / {d['size_pos']}；奇偶 {d['parity_mother']} / {d['parity_pos']}")
-        st.write(f"大小母形态：**{r['mother_size']}**")
-        st.write(f"奇偶母形态：**{r['mother_parity']}**")
-        st.write("大小正常入选6形态："+"、".join(r["allowed_size"]))
-        st.write("奇偶正常入选6形态："+"、".join(r["allowed_parity"]))
-        st.write(f"全量正常出号：**{len(r['full'])} 注**")
-        st.write(f"二同+三同：**{len(r['same23'])} 注**")
-        st.write(f"三不同：**{len(r['different'])} 注**")
+        if d.get("error"):
+            st.error(d["error"])
+        else:
+            st.divider()
+            st.write(f"大小入选形态：**{len(d['size_selected'])}个**")
+            st.write("、".join(d["size_selected"]))
+            st.write(f"奇偶入选形态：**{len(d['parity_selected'])}个**")
+            st.write("、".join(d["parity_selected"]))
+            st.write(f"全量入选：**{len(d['full'])} 注**")
+            st.write(f"二同+三同：**{len(d['same23'])} 注**")
+            st.write(f"三不同：**{len(d['different'])} 注**")
 
-        if len(r["same23"])+len(r["different"])==len(r["full"]):
-            st.success(f"闭环：{len(r['same23'])} + {len(r['different'])} = {len(r['full'])} √")
+            if len(d["same23"])+len(d["different"])==len(d["full"]):
+                st.success(f"闭环：{len(d['same23'])} + {len(d['different'])} = {len(d['full'])} √")
 
-        base=f"形态取号_大小{d['size_mother']}{d['size_pos']}_奇偶{d['parity_mother']}{d['parity_pos']}"
-        show_download("下载全量",r["full"],f"{base}_全量_{len(r['full'])}注.txt","shape_k1_full")
-        show_download("下载二同+三同",r["same23"],f"{base}_二同三同_{len(r['same23'])}注.txt","shape_k1_same")
-        show_download("下载三不同",r["different"],f"{base}_三不同_{len(r['different'])}注.txt","shape_k1_diff")
+            base=f"形态取号_大小{len(d['size_selected'])}形态_奇偶{len(d['parity_selected'])}形态"
+            show_download("下载全量",d["full"],f"{base}_全量_{len(d['full'])}注.txt","shape_pick_full")
+            show_download("下载二同+三同",d["same23"],f"{base}_二同三同_{len(d['same23'])}注.txt","shape_pick_same")
+            show_download("下载三不同",d["different"],f"{base}_三不同_{len(d['different'])}注.txt","shape_pick_diff")
 
 elif mode=="口径1双条件全量交集":
     st.subheader("两个口径1条件 → 全量交集")
