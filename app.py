@@ -36,10 +36,8 @@ def show_download(label, nums, filename, key):
 
 def size_shape(num): return "".join("大" if int(d)>=5 else "小" for d in num)
 def parity_shape(num): return "".join("奇" if int(d)%2 else "偶" for d in num)
-
 def repeat_type(num):
-    n=len(set(num))
-    return "三不同" if n==3 else ("二同" if n==2 else "三同")
+    n=len(set(num)); return "三不同" if n==3 else ("二同" if n==2 else "三同")
 
 def allowed_shapes(mother_shape, position_name, all_shapes):
     pos=POSITION_MAP[position_name]
@@ -47,62 +45,41 @@ def allowed_shapes(mother_shape, position_name, all_shapes):
 
 def normalize_rule_text(text):
     text=(text or "").strip()
-    for ch in [" ","+","/","／","，",",","；",";","：",":"]:
-        text=text.replace(ch,"")
+    for ch in [" ","+","/","／","，",",","；",";","：",":"]: text=text.replace(ch,"")
     return text
 
 def parse_koujing1(text):
     text=normalize_rule_text(text)
     m=re.match(r'^(\d{3})(.*)$',text)
-    if not m:
-        return None,"格式无法识别"
-
+    if not m: return None,"格式无法识别"
     mother,rule=m.group(1),m.group(2)
-
     if rule in POSITION_MAP:
-        return {
-            "mother":mother,
-            "size_pos":rule,
-            "parity_pos":rule,
-            "display_rule":rule
-        },None
-
+        return {"mother":mother,"size_pos":rule,"parity_pos":rule,"display_rule":rule},None
     m2=re.fullmatch(r'大小(百十|百个|十个)奇偶(百十|百个|十个)',rule)
-
     if m2:
-        return {
-            "mother":mother,
-            "size_pos":m2.group(1),
-            "parity_pos":m2.group(2),
-            "display_rule":f"大小{m2.group(1)} + 奇偶{m2.group(2)}"
-        },None
-
+        return {"mother":mother,"size_pos":m2.group(1),"parity_pos":m2.group(2),"display_rule":f"大小{m2.group(1)} + 奇偶{m2.group(2)}"},None
     return None,"取位无法识别，例如：818十个 或 888大小百十奇偶十个"
 
 def run_koujing1(mother,size_pos,parity_pos):
     ms,mp=size_shape(mother),parity_shape(mother)
     asize=allowed_shapes(ms,size_pos,SIZE_SHAPES)
     apar=allowed_shapes(mp,parity_pos,PARITY_SHAPES)
+    full=[n for n in ALL_NUMBERS if size_shape(n) in asize and parity_shape(n) in apar]
+    same=[n for n in full if repeat_type(n)!="三不同"]
+    diff=[n for n in full if repeat_type(n)=="三不同"]
+    return {"mother_size":ms,"mother_parity":mp,"allowed_size":asize,"allowed_parity":apar,"full":sorted(full),"same23":sorted(same),"different":sorted(diff)}
 
-    full=[
-        n for n in ALL_NUMBERS
-        if size_shape(n) in asize
-        and parity_shape(n) in apar
-    ]
-
-    same=[
-        n for n in full
-        if repeat_type(n)!="三不同"
-    ]
-
-    diff=[
-        n for n in full
-        if repeat_type(n)=="三不同"
-    ]
-
+def run_shape_koujing1(size_mother_shape,size_pos,parity_mother_shape,parity_pos):
+    # 与口径1完全同一套“八形态反筛法”。
+    # 唯一区别：不再从三位数字推导母号形态，而是直接由用户指定大小母形态和奇偶母形态。
+    asize=allowed_shapes(size_mother_shape,size_pos,SIZE_SHAPES)
+    apar=allowed_shapes(parity_mother_shape,parity_pos,PARITY_SHAPES)
+    full=[n for n in ALL_NUMBERS if size_shape(n) in asize and parity_shape(n) in apar]
+    same=[n for n in full if repeat_type(n)!="三不同"]
+    diff=[n for n in full if repeat_type(n)=="三不同"]
     return {
-        "mother_size":ms,
-        "mother_parity":mp,
+        "mother_size":size_mother_shape,
+        "mother_parity":parity_mother_shape,
         "allowed_size":asize,
         "allowed_parity":apar,
         "full":sorted(full),
@@ -110,58 +87,18 @@ def run_koujing1(mother,size_pos,parity_pos):
         "different":sorted(diff)
     }
 
-def parse_shape_pick(text):
-    s=(text or "").replace(" ","").replace("+","").replace("/","").replace("／","").replace(",","").replace("，","")
-    a=next((x for x in SIZE_SHAPES if x in s),None)
-    b=next((x for x in PARITY_SHAPES if x in s),None)
-    return a,b
-
-def run_shape_pick(size_target=None,parity_target=None):
-    full=[
-        n for n in ALL_NUMBERS
-        if (not size_target or size_shape(n)==size_target)
-        and (not parity_target or parity_shape(n)==parity_target)
-    ]
-
-    same=[
-        n for n in full
-        if repeat_type(n)!="三不同"
-    ]
-
-    diff=[
-        n for n in full
-        if repeat_type(n)=="三不同"
-    ]
-
-    return {
-        "full":sorted(full),
-        "same23":sorted(same),
-        "different":sorted(diff)
-    }
-
 def parse_digit_track(text):
-    s=(text or "").replace("数字","").replace(" ","")
-    out=[]
-
+    s=(text or "").replace("数字","").replace(" ",""); out=[]
     for c in s:
-        if c.isdigit() and c not in out:
-            out.append(c)
-
+        if c.isdigit() and c not in out: out.append(c)
     return out
 
 def run_digit_track(base_nums,target_digits):
     buckets={}
-
     for num in base_nums:
         c=sum(1 for d in target_digits if d not in num)
         buckets.setdefault(c,[]).append(num)
-
-    bc=sorted(
-        set(buckets.get(2,[]))
-        |
-        set(buckets.get(3,[]))
-    )
-
+    bc=sorted(set(buckets.get(2,[]))|set(buckets.get(3,[])))
     return buckets,bc
 
 def classify_shape_token(token):
@@ -170,2968 +107,376 @@ def classify_shape_token(token):
     return None
 
 def run_shape_track(base_nums,shape_tokens):
-    valid=[
-        (t,classify_shape_token(t))
-        for t in shape_tokens
-        if classify_shape_token(t)
-    ]
-
+    valid=[(t,classify_shape_token(t)) for t in shape_tokens if classify_shape_token(t)]
     counts={n:0 for n in base_nums}
-
     for token,kind in valid:
         for n in base_nums:
             matched=(size_shape(n)==token) if kind=="size" else (parity_shape(n)==token)
-            if not matched:
-                counts[n]+=1
-
+            if not matched: counts[n]+=1
     buckets={}
-
-    for n,c in counts.items():
-        buckets.setdefault(c,[]).append(n)
-
-    cd=sorted(
-        set(buckets.get(3,[]))
-        |
-        set(buckets.get(4,[]))
-    )
-
+    for n,c in counts.items(): buckets.setdefault(c,[]).append(n)
+    cd=sorted(set(buckets.get(3,[]))|set(buckets.get(4,[])))
     return valid,buckets,cd
 
 def canonical_pair(pair):
     return "".join(sorted(pair)) if len(pair)==2 and pair.isdigit() else None
 
 def parse_pair_conditions(text):
-    return {
-        canonical_pair(p)
-        for p in re.findall(r'(?<!\d)\d{2}(?!\d)',text or "")
-        if canonical_pair(p)
-    }
+    return {canonical_pair(p) for p in re.findall(r'(?<!\d)\d{2}(?!\d)',text or "") if canonical_pair(p)}
 
 def pair_hit_count(num,pair_set):
     a,b,c=num
-
-    pairs=[
-        canonical_pair(a+b),
-        canonical_pair(a+c),
-        canonical_pair(b+c)
-    ]
-
-    return sum(
-        1 for p in pairs
-        if p in pair_set
-    )
+    pairs=[canonical_pair(a+b),canonical_pair(a+c),canonical_pair(b+c)]
+    return sum(1 for p in pairs if p in pair_set)
 
 def run_pair_filter(base_nums,pair_set,mode):
     sel,rej=[],[]
-
     for n in base_nums:
         h=pair_hit_count(n,pair_set)
-
-        ok=(
-            h>=2
-            if mode=="两对命中（至少2对）"
-            else (
-                h==2
-                if mode=="恰好两对命中"
-                else h==3
-            )
-        )
-
+        ok=h>=2 if mode=="两对命中（至少2对）" else (h==2 if mode=="恰好两对命中" else h==3)
         (sel if ok else rej).append(n)
-
     return sorted(sel),sorted(rej)
+
+def split_to_pairs(token):
+    """将3-7位数字按任意两位拆分为两位组合；每对内部按升序标准化并去重。"""
+    token=(token or "").strip()
+    if not (token.isdigit() and 3 <= len(token) <= 7):
+        return []
+    pairs=set()
+    for i in range(len(token)):
+        for j in range(i+1,len(token)):
+            pairs.add(canonical_pair(token[i]+token[j]))
+    return sorted(pairs)
+
+def parse_split_inputs(text):
+    # 只识别独立的3-7位数字串，支持空格、换行、逗号等分隔。
+    return re.findall(r'(?<!\d)\d{3,7}(?!\d)', text or "")
 
 def sequence_type(num):
     d=sorted(int(x) for x in num)
-
-    if len(set(d))!=3:
-        return "非半顺"
-
-    if d[1]-d[0]==1 and d[2]-d[1]==1:
-        return "全顺"
-
-    if d[1]-d[0]==1 or d[2]-d[1]==1:
-        return "半顺"
-
+    if len(set(d))!=3: return "非半顺"
+    if d[1]-d[0]==1 and d[2]-d[1]==1: return "全顺"
+    if d[1]-d[0]==1 or d[2]-d[1]==1: return "半顺"
     return "非半顺"
 
-mode=st.selectbox(
-    "选择功能",
-    [
-        "口径1取号",
-        "形态取号",
-        "口径1双条件全量交集",
-        "口径1交集后数字形态轨",
-        "交集 / 不交集",
-        "A分别与多个文件交集",
-        "合并去重",
-        "形态筛选",
-        "二同 / 三同 / 三不同",
-        "两位组合命中筛选（按附件）",
-        "两位组合命中筛选（000-999）",
-        "数字包含 / 去除筛选",
-        "半顺以上筛选"
-    ]
-)
-# =========================================================
-# 1. 口径1取号
-# =========================================================
+mode=st.selectbox("选择功能",[
+    "口径1取号","形态取号","口径1双条件全量交集","口径1交集后数字形态轨","交集 / 不交集",
+    "A分别与多个文件交集","合并去重","形态筛选","二同 / 三同 / 三不同",
+    "两位组合命中筛选（按附件）","两位组合命中筛选（000-999）","数字包含 / 去除筛选","三至七位拆两位组合","半顺以上筛选"
+])
 
 if mode=="口径1取号":
-
     st.subheader("口径1正常取号")
-
-    with st.form("k1_form"):
-
-        text=st.text_area(
-            "输入条件（可多行）",
-            placeholder=(
-                "592百个\n"
-                "888大小百十奇偶十个"
-            ),
-            height=140
-        )
-
-        submitted=st.form_submit_button(
-            "开始取号"
-        )
-
-    if submitted:
-
-        lines=[
-            x.strip()
-            for x in text.splitlines()
-            if x.strip()
-        ]
-
-        results=[]
-        errors=[]
-
-        for line in lines:
-
-            parsed,error=parse_koujing1(line)
-
-            if error:
-                errors.append(
-                    f"{line}：{error}"
-                )
-                continue
-
-            r=run_koujing1(
-                parsed["mother"],
-                parsed["size_pos"],
-                parsed["parity_pos"]
-            )
-
-            results.append({
-                "parsed":parsed,
-                "result":r
-            })
-
-        save_result(
-            "口径1取号",
-            {
-                "results":results,
-                "errors":errors
-            }
-        )
-
-    data=get_result("口径1取号")
-
+    with st.form("k1"):
+        text=st.text_area("输入条件（可多行）",placeholder="592百个\n888大小百十奇偶十个",height=140)
+        go=st.form_submit_button("开始取号")
+    if go:
+        items=[]; errs=[]
+        for line in [x.strip() for x in text.splitlines() if x.strip()]:
+            p,e=parse_koujing1(line)
+            if e: errs.append(f"{line}：{e}"); continue
+            items.append((p,run_koujing1(p["mother"],p["size_pos"],p["parity_pos"])))
+        save_result(mode,{"items":items,"errs":errs})
+    data=get_result(mode)
     if data:
-
-        for error in data["errors"]:
-            st.error(error)
-
-        for idx,item in enumerate(
-            data["results"],
-            start=1
-        ):
-
-            parsed=item["parsed"]
-            r=item["result"]
-
-            full=r["full"]
-            same23=r["same23"]
-            different=r["different"]
-
-            st.divider()
-
-            st.markdown(
-                f"## {parsed['mother']} "
-                f"{parsed['display_rule']}"
-            )
-
-            st.write(
-                f"母号大小："
-                f"**{r['mother_size']}**"
-            )
-
-            st.write(
-                f"母号奇偶："
-                f"**{r['mother_parity']}**"
-            )
-
-            st.write(
-                "大小正常入选6形态："
-                +
-                "、".join(
-                    r["allowed_size"]
-                )
-            )
-
-            st.write(
-                "奇偶正常入选6形态："
-                +
-                "、".join(
-                    r["allowed_parity"]
-                )
-            )
-
-            st.write(
-                f"全量正常出号："
-                f"**{len(full)} 注**"
-            )
-
-            st.write(
-                f"二同+三同："
-                f"**{len(same23)} 注**"
-            )
-
-            st.write(
-                f"三不同："
-                f"**{len(different)} 注**"
-            )
-
-            if (
-                len(same23)
-                +
-                len(different)
-                ==
-                len(full)
-            ):
-
-                st.success(
-                    f"闭环："
-                    f"{len(same23)} + "
-                    f"{len(different)} = "
-                    f"{len(full)} √"
-                )
-
-            base=(
-                f"{parsed['mother']}_"
-                f"{parsed['size_pos']}_"
-                f"{parsed['parity_pos']}"
-            )
-
-            show_download(
-                "下载全量",
-                full,
-                f"{base}_全量_{len(full)}注.txt",
-                f"k1_full_{idx}"
-            )
-
-            show_download(
-                "下载二同+三同",
-                same23,
-                f"{base}_二同三同_{len(same23)}注.txt",
-                f"k1_same_{idx}"
-            )
-
-            show_download(
-                "下载三不同",
-                different,
-                f"{base}_三不同_{len(different)}注.txt",
-                f"k1_diff_{idx}"
-            )
-
-
-# =========================================================
-# 2. 形态取号
-# =========================================================
+        for e in data["errs"]: st.error(e)
+        for i,(p,r) in enumerate(data["items"],1):
+            st.divider(); st.markdown(f"## {p['mother']} {p['display_rule']}")
+            st.write(f"母号大小：**{r['mother_size']}**"); st.write(f"母号奇偶：**{r['mother_parity']}**")
+            st.write("大小正常入选6形态："+"、".join(r["allowed_size"])); st.write("奇偶正常入选6形态："+"、".join(r["allowed_parity"]))
+            st.write(f"全量正常出号：**{len(r['full'])} 注**"); st.write(f"二同+三同：**{len(r['same23'])} 注**"); st.write(f"三不同：**{len(r['different'])} 注**")
+            st.success(f"闭环：{len(r['same23'])} + {len(r['different'])} = {len(r['full'])} √")
+            base=f"{p['mother']}_{p['size_pos']}_{p['parity_pos']}"
+            show_download("下载全量",r["full"],f"{base}_全量_{len(r['full'])}注.txt",f"k1f{i}")
+            show_download("下载二同+三同",r["same23"],f"{base}_二同三同_{len(r['same23'])}注.txt",f"k1s{i}")
+            show_download("下载三不同",r["different"],f"{base}_三不同_{len(r['different'])}注.txt",f"k1d{i}")
 
 elif mode=="形态取号":
+    st.subheader("形态取号（按口径1八形态反筛法）")
+    st.caption("和口径1算法完全相同，只是不输入三位数字，直接指定大小母形态、奇偶母形态以及各自取位。")
 
-    st.subheader(
-        "按完整大小 / 奇偶形态取号"
-    )
+    with st.form("shape_pick"):
+        size_mother=st.selectbox("大小母形态", SIZE_SHAPES, key="shape_size_mother")
+        size_pos=st.selectbox("大小取位", ["百十","百个","十个"], key="shape_size_pos")
+        parity_mother=st.selectbox("奇偶母形态", PARITY_SHAPES, key="shape_parity_mother")
+        parity_pos=st.selectbox("奇偶取位", ["百十","百个","十个"], key="shape_parity_pos")
+        go=st.form_submit_button("开始形态取号")
 
-    st.caption(
-        "例如：大大小偶偶奇；"
-        "也可以只输入大大小或偶偶奇。"
-    )
+    if go:
+        r=run_shape_koujing1(size_mother,size_pos,parity_mother,parity_pos)
+        save_result(mode,{
+            "size_mother":size_mother,
+            "size_pos":size_pos,
+            "parity_mother":parity_mother,
+            "parity_pos":parity_pos,
+            "r":r
+        })
 
-    with st.form("shape_pick_form"):
+    d=get_result(mode)
+    if d:
+        r=d["r"]
+        st.divider()
+        st.markdown(f"## 大小 {d['size_mother']} / {d['size_pos']}；奇偶 {d['parity_mother']} / {d['parity_pos']}")
+        st.write(f"大小母形态：**{r['mother_size']}**")
+        st.write(f"奇偶母形态：**{r['mother_parity']}**")
+        st.write("大小正常入选6形态："+"、".join(r["allowed_size"]))
+        st.write("奇偶正常入选6形态："+"、".join(r["allowed_parity"]))
+        st.write(f"全量正常出号：**{len(r['full'])} 注**")
+        st.write(f"二同+三同：**{len(r['same23'])} 注**")
+        st.write(f"三不同：**{len(r['different'])} 注**")
 
-        shape_text=st.text_area(
-            "输入形态（可多行）",
-            placeholder=(
-                "大大小偶偶奇\n"
-                "小小大 奇偶偶\n"
-                "大大大"
-            ),
-            height=150
-        )
+        if len(r["same23"])+len(r["different"])==len(r["full"]):
+            st.success(f"闭环：{len(r['same23'])} + {len(r['different'])} = {len(r['full'])} √")
 
-        submitted=st.form_submit_button(
-            "开始形态取号"
-        )
-
-    if submitted:
-
-        lines=[
-            x.strip()
-            for x in shape_text.splitlines()
-            if x.strip()
-        ]
-
-        results=[]
-        errors=[]
-
-        for line in lines:
-
-            size_target,parity_target=(
-                parse_shape_pick(line)
-            )
-
-            if (
-                not size_target
-                and
-                not parity_target
-            ):
-                errors.append(
-                    f"{line}：无法识别形态"
-                )
-                continue
-
-            r=run_shape_pick(
-                size_target,
-                parity_target
-            )
-
-            results.append({
-                "size_target":size_target,
-                "parity_target":parity_target,
-                "result":r
-            })
-
-        save_result(
-            "形态取号",
-            {
-                "results":results,
-                "errors":errors
-            }
-        )
-
-    data=get_result("形态取号")
-
-    if data:
-
-        for error in data["errors"]:
-            st.error(error)
-
-        for idx,item in enumerate(
-            data["results"],
-            start=1
-        ):
-
-            r=item["result"]
-
-            full=r["full"]
-            same23=r["same23"]
-            different=r["different"]
-
-            title_parts=[]
-
-            if item["size_target"]:
-                title_parts.append(
-                    item["size_target"]
-                )
-
-            if item["parity_target"]:
-                title_parts.append(
-                    item["parity_target"]
-                )
-
-            title=" + ".join(
-                title_parts
-            )
-
-            st.divider()
-
-            st.markdown(
-                f"## {title}"
-            )
-
-            st.write(
-                f"全量："
-                f"**{len(full)} 注**"
-            )
-
-            st.write(
-                f"二同+三同："
-                f"**{len(same23)} 注**"
-            )
-
-            st.write(
-                f"三不同："
-                f"**{len(different)} 注**"
-            )
-
-            if (
-                len(same23)
-                +
-                len(different)
-                ==
-                len(full)
-            ):
-
-                st.success(
-                    f"闭环："
-                    f"{len(same23)} + "
-                    f"{len(different)} = "
-                    f"{len(full)} √"
-                )
-
-            safe="_".join(
-                title_parts
-            )
-
-            show_download(
-                "下载全量",
-                full,
-                f"{safe}_全量_{len(full)}注.txt",
-                f"shape_pick_full_{idx}"
-            )
-
-            show_download(
-                "下载二同+三同",
-                same23,
-                f"{safe}_二同三同_{len(same23)}注.txt",
-                f"shape_pick_same_{idx}"
-            )
-
-            show_download(
-                "下载三不同",
-                different,
-                f"{safe}_三不同_{len(different)}注.txt",
-                f"shape_pick_diff_{idx}"
-            )
-
-
-# =========================================================
-# 3. 口径1双条件全量交集
-# =========================================================
+        base=f"形态取号_大小{d['size_mother']}{d['size_pos']}_奇偶{d['parity_mother']}{d['parity_pos']}"
+        show_download("下载全量",r["full"],f"{base}_全量_{len(r['full'])}注.txt","shape_k1_full")
+        show_download("下载二同+三同",r["same23"],f"{base}_二同三同_{len(r['same23'])}注.txt","shape_k1_same")
+        show_download("下载三不同",r["different"],f"{base}_三不同_{len(r['different'])}注.txt","shape_k1_diff")
 
 elif mode=="口径1双条件全量交集":
-
-    st.subheader(
-        "两个口径1条件 → 全量交集"
-    )
-
-    with st.form(
-        "double_k1_form"
-    ):
-
-        text_a=st.text_input(
-            "条件A",
-            placeholder="例如：818十个"
-        )
-
-        text_b=st.text_input(
-            "条件B",
-            placeholder="例如：881十个"
-        )
-
-        submitted=st.form_submit_button(
-            "开始全量交集分析"
-        )
-
-    if submitted:
-
-        pa,ea=parse_koujing1(
-            text_a
-        )
-
-        pb,eb=parse_koujing1(
-            text_b
-        )
-
-        if ea or eb:
-
-            save_result(
-                "口径1双条件全量交集",
-                {
-                    "error_a":ea,
-                    "error_b":eb
-                }
-            )
-
+    st.subheader("两个口径1条件 → 全量交集")
+    with st.form("double_k1"):
+        ta=st.text_input("条件A",placeholder="例如：818十个"); tb=st.text_input("条件B",placeholder="例如：881十个")
+        go=st.form_submit_button("开始全量交集分析")
+    if go:
+        pa,ea=parse_koujing1(ta); pb,eb=parse_koujing1(tb)
+        if ea or eb: save_result(mode,{"error":f"A：{ea}" if ea else f"B：{eb}"})
         else:
-
-            ra=run_koujing1(
-                pa["mother"],
-                pa["size_pos"],
-                pa["parity_pos"]
-            )
-
-            rb=run_koujing1(
-                pb["mother"],
-                pb["size_pos"],
-                pb["parity_pos"]
-            )
-
-            A=set(
-                ra["full"]
-            )
-
-            B=set(
-                rb["full"]
-            )
-
-            inter=sorted(
-                A & B
-            )
-
-            a_only=sorted(
-                A - B
-            )
-
-            b_only=sorted(
-                B - A
-            )
-
-            non_inter=sorted(
-                (A - B)
-                |
-                (B - A)
-            )
-
-            union=sorted(
-                A | B
-            )
-
-            save_result(
-                "口径1双条件全量交集",
-                {
-                    "error_a":None,
-                    "error_b":None,
-                    "A":sorted(A),
-                    "B":sorted(B),
-                    "inter":inter,
-                    "a_only":a_only,
-                    "b_only":b_only,
-                    "non_inter":non_inter,
-                    "union":union
-                }
-            )
-
-    data=get_result(
-        "口径1双条件全量交集"
-    )
-
-    if data:
-
-        if data.get("error_a"):
-
-            st.error(
-                f"A：{data['error_a']}"
-            )
-
-        elif data.get("error_b"):
-
-            st.error(
-                f"B：{data['error_b']}"
-            )
-
-        elif "A" in data:
-
-            A=data["A"]
-            B=data["B"]
-
-            inter=data["inter"]
-            a_only=data["a_only"]
-            b_only=data["b_only"]
-            non_inter=data["non_inter"]
-            union=data["union"]
-
-            st.write(
-                f"A全量："
-                f"**{len(A)} 注**"
-            )
-
-            st.write(
-                f"B全量："
-                f"**{len(B)} 注**"
-            )
-
-            st.write(
-                f"交集："
-                f"**{len(inter)} 注**"
-            )
-
-            st.write(
-                f"A独有："
-                f"**{len(a_only)} 注**"
-            )
-
-            st.write(
-                f"B独有："
-                f"**{len(b_only)} 注**"
-            )
-
-            st.write(
-                f"不交集合并："
-                f"**{len(non_inter)} 注**"
-            )
-
-            st.write(
-                f"合并去重："
-                f"**{len(union)} 注**"
-            )
-
-            left=(
-                len(A)
-                +
-                len(B)
-            )
-
-            right=(
-                2*len(inter)
-                +
-                len(non_inter)
-            )
-
-            if left==right:
-
-                st.success(
-                    f"闭环："
-                    f"{len(A)} + "
-                    f"{len(B)} = "
-                    f"2×{len(inter)} + "
-                    f"{len(non_inter)} "
-                    f"= {left} √"
-                )
-
-            show_download(
-                "下载A全量",
-                A,
-                f"A全量_{len(A)}注.txt",
-                "double_a"
-            )
-
-            show_download(
-                "下载B全量",
-                B,
-                f"B全量_{len(B)}注.txt",
-                "double_b"
-            )
-
-            show_download(
-                "下载交集",
-                inter,
-                f"交集_{len(inter)}注.txt",
-                "double_inter"
-            )
-
-            show_download(
-                "下载A独有",
-                a_only,
-                f"A独有_{len(a_only)}注.txt",
-                "double_a_only"
-            )
-
-            show_download(
-                "下载B独有",
-                b_only,
-                f"B独有_{len(b_only)}注.txt",
-                "double_b_only"
-            )
-
-            show_download(
-                "下载不交集合并",
-                non_inter,
-                f"不交集合并_{len(non_inter)}注.txt",
-                "double_non"
-            )
-
-            show_download(
-                "下载合并去重",
-                union,
-                f"合并去重_{len(union)}注.txt",
-                "double_union"
-            )
-            # =========================================================
-# 4. 口径1交集后数字形态轨
-# =========================================================
+            A=set(run_koujing1(pa["mother"],pa["size_pos"],pa["parity_pos"])["full"]); B=set(run_koujing1(pb["mother"],pb["size_pos"],pb["parity_pos"])["full"])
+            save_result(mode,{"A":sorted(A),"B":sorted(B),"inter":sorted(A&B),"ao":sorted(A-B),"bo":sorted(B-A),"non":sorted((A-B)|(B-A)),"union":sorted(A|B)})
+    d=get_result(mode)
+    if d:
+        if d.get("error"): st.error(d["error"])
+        else:
+            st.write(f"A全量：**{len(d['A'])} 注**"); st.write(f"B全量：**{len(d['B'])} 注**"); st.write(f"交集：**{len(d['inter'])} 注**"); st.write(f"A独有：**{len(d['ao'])} 注**"); st.write(f"B独有：**{len(d['bo'])} 注**"); st.write(f"不交集合并：**{len(d['non'])} 注**"); st.write(f"合并去重：**{len(d['union'])} 注**")
+            st.success(f"闭环：{len(d['A'])}+{len(d['B'])}=2×{len(d['inter'])}+{len(d['non'])} √")
+            for label,keyname,arr in [("下载A全量","A",d["A"]),("下载B全量","B",d["B"]),("下载交集","I",d["inter"]),("下载A独有","AO",d["ao"]),("下载B独有","BO",d["bo"]),("下载不交集合并","N",d["non"]),("下载合并去重","U",d["union"])]:
+                show_download(label,arr,f"{label.replace('下载','')}_{len(arr)}注.txt",f"dbl{keyname}")
 
 elif mode=="口径1交集后数字形态轨":
-
-    st.subheader(
-        "口径1 → 三不同交集/独有 → "
-        "数字BC → 形态CD → BC∩CD"
-    )
-
-    with st.form(
-        "track_form"
-    ):
-
-        text_a=st.text_input(
-            "母号A条件",
-            placeholder="例如：983十个"
-        )
-
-        text_b=st.text_input(
-            "母号B条件",
-            placeholder="例如：938十个"
-        )
-
-        digit_text=st.text_input(
-            "数字轨",
-            placeholder="例如：数字389"
-        )
-
-        shape_text=st.text_area(
-            "形态轨（4个完整三位形态，每行一个）",
-            placeholder=(
-                "大大小\n"
-                "小小小\n"
-                "奇偶奇\n"
-                "偶奇偶"
-            ),
-            height=140
-        )
-
-        submitted=st.form_submit_button(
-            "开始完整分析"
-        )
-
-    if submitted:
-
-        pa,ea=parse_koujing1(
-            text_a
-        )
-
-        pb,eb=parse_koujing1(
-            text_b
-        )
-
-        digits=parse_digit_track(
-            digit_text
-        )
-
-        shapes=[
-            x.strip()
-            for x in shape_text.splitlines()
-            if x.strip()
-        ]
-
-        error=None
-
-        if ea:
-            error=f"A：{ea}"
-
-        elif eb:
-            error=f"B：{eb}"
-
-        elif not digits:
-            error="请输入数字轨"
-
-        elif len(shapes)!=4:
-            error="形态轨必须输入4个完整三位形态"
-
+    st.subheader("口径1 → 三不同交集/独有 → 数字BC → 形态CD → BC∩CD")
+    with st.form("track"):
+        ta=st.text_input("母号A条件",placeholder="例如：983十个"); tb=st.text_input("母号B条件",placeholder="例如：938十个")
+        dt=st.text_input("数字轨",placeholder="例如：数字389"); sh=st.text_area("形态轨（4个完整三位形态，每行一个）",placeholder="大大小\n小小小\n奇偶奇\n偶奇偶",height=140)
+        go=st.form_submit_button("开始完整分析")
+    if go:
+        pa,ea=parse_koujing1(ta); pb,eb=parse_koujing1(tb); digits=parse_digit_track(dt); shapes=[x.strip() for x in sh.splitlines() if x.strip()]
+        err=(f"A：{ea}" if ea else (f"B：{eb}" if eb else ("请输入数字轨" if not digits else ("形态轨必须输入4个完整三位形态" if len(shapes)!=4 else None))))
+        if not err:
+            bad=[x for x in shapes if classify_shape_token(x) is None]
+            if bad: err="无法识别形态："+"、".join(bad)
+        if err: save_result(mode,{"error":err})
         else:
-
-            invalid=[
-                s
-                for s in shapes
-                if classify_shape_token(s)
-                is None
-            ]
-
-            if invalid:
-                error=(
-                    "无法识别形态："
-                    +
-                    "、".join(invalid)
-                )
-
-        if error:
-
-            save_result(
-                "口径1交集后数字形态轨",
-                {
-                    "error":error
-                }
-            )
-
+            A=set(run_koujing1(pa["mother"],pa["size_pos"],pa["parity_pos"])["different"]); B=set(run_koujing1(pb["mother"],pb["size_pos"],pb["parity_pos"])["different"])
+            inter=sorted(A&B); ao=sorted(A-B); bo=sorted(B-A); non=sorted((A-B)|(B-A)); db,bc=run_digit_track(non,digits); vs,sb,cd=run_shape_track(non,shapes); fin=sorted(set(bc)&set(cd)); fout=sorted(set(non)-set(fin))
+            save_result(mode,{"A":sorted(A),"B":sorted(B),"inter":inter,"ao":ao,"bo":bo,"non":non,"digits":digits,"db":db,"bc":bc,"vs":vs,"sb":sb,"cd":cd,"fin":fin,"fout":fout})
+    d=get_result(mode)
+    if d:
+        if d.get("error"): st.error(d["error"])
         else:
-
-            ra=run_koujing1(
-                pa["mother"],
-                pa["size_pos"],
-                pa["parity_pos"]
-            )
-
-            rb=run_koujing1(
-                pb["mother"],
-                pb["size_pos"],
-                pb["parity_pos"]
-            )
-
-            A=set(
-                ra["different"]
-            )
-
-            B=set(
-                rb["different"]
-            )
-
-            inter=sorted(
-                A & B
-            )
-
-            a_only=sorted(
-                A - B
-            )
-
-            b_only=sorted(
-                B - A
-            )
-
-            non_inter=sorted(
-                (A - B)
-                |
-                (B - A)
-            )
-
-            digit_buckets,digit_bc=(
-                run_digit_track(
-                    non_inter,
-                    digits
-                )
-            )
-
-            (
-                valid_shapes,
-                shape_buckets,
-                shape_cd
-            )=run_shape_track(
-                non_inter,
-                shapes
-            )
-
-            final_in=sorted(
-                set(digit_bc)
-                &
-                set(shape_cd)
-            )
-
-            final_out=sorted(
-                set(non_inter)
-                -
-                set(final_in)
-            )
-
-            save_result(
-                "口径1交集后数字形态轨",
-                {
-                    "error":None,
-                    "A":sorted(A),
-                    "B":sorted(B),
-                    "inter":inter,
-                    "a_only":a_only,
-                    "b_only":b_only,
-                    "non_inter":non_inter,
-                    "digits":digits,
-                    "digit_buckets":digit_buckets,
-                    "digit_bc":digit_bc,
-                    "valid_shapes":valid_shapes,
-                    "shape_buckets":shape_buckets,
-                    "shape_cd":shape_cd,
-                    "final_in":final_in,
-                    "final_out":final_out
-                }
-            )
-
-    data=get_result(
-        "口径1交集后数字形态轨"
-    )
-
-    if data:
-
-        if data.get("error"):
-
-            st.error(
-                data["error"]
-            )
-
-        elif "A" in data:
-
-            A=data["A"]
-            B=data["B"]
-            inter=data["inter"]
-            a_only=data["a_only"]
-            b_only=data["b_only"]
-            non_inter=data["non_inter"]
-
-            st.markdown(
-                "## ① 前置母号结果"
-            )
-
-            st.write(
-                f"A三不同："
-                f"**{len(A)} 注**"
-            )
-
-            st.write(
-                f"B三不同："
-                f"**{len(B)} 注**"
-            )
-
-            st.write(
-                f"交集："
-                f"**{len(inter)} 注**"
-            )
-
-            st.write(
-                f"A独有："
-                f"**{len(a_only)} 注**"
-            )
-
-            st.write(
-                f"B独有："
-                f"**{len(b_only)} 注**"
-            )
-
-            st.write(
-                f"不交集合并："
-                f"**{len(non_inter)} 注**"
-            )
-
-            left=(
-                len(A)
-                +
-                len(B)
-            )
-
-            right=(
-                2*len(inter)
-                +
-                len(non_inter)
-            )
-
-            if left==right:
-
-                st.success(
-                    f"前置闭环："
-                    f"{len(A)} + "
-                    f"{len(B)} = "
-                    f"2×{len(inter)} + "
-                    f"{len(non_inter)} "
-                    f"= {left} √"
-                )
-
-            show_download(
-                "下载A三不同",
-                A,
-                f"A三不同_{len(A)}注.txt",
-                "track_a"
-            )
-
-            show_download(
-                "下载B三不同",
-                B,
-                f"B三不同_{len(B)}注.txt",
-                "track_b"
-            )
-
-            show_download(
-                "下载交集",
-                inter,
-                f"交集_{len(inter)}注.txt",
-                "track_inter"
-            )
-
-            show_download(
-                "下载A独有",
-                a_only,
-                f"A独有_{len(a_only)}注.txt",
-                "track_a_only"
-            )
-
-            show_download(
-                "下载B独有",
-                b_only,
-                f"B独有_{len(b_only)}注.txt",
-                "track_b_only"
-            )
-
-            show_download(
-                "下载不交集合并",
-                non_inter,
-                f"不交集合并_{len(non_inter)}注.txt",
-                "track_non"
-            )
-
-            digit_buckets=data[
-                "digit_buckets"
-            ]
-
-            digit_bc=data[
-                "digit_bc"
-            ]
-
-            st.markdown(
-                "## ② 数字轨"
-            )
-
-            st.write(
-                "目标数字："
-                +
-                "、".join(
-                    data["digits"]
-                )
-            )
-
-            for count in sorted(
-                digit_buckets
-            ):
-
-                st.write(
-                    f"出现{count}次："
-                    f"**"
-                    f"{len(digit_buckets[count])}"
-                    f" 注**"
-                )
-
-            st.write(
-                f"数字BC（2次+3次）："
-                f"**{len(digit_bc)} 注**"
-            )
-
-            show_download(
-                "下载数字BC",
-                digit_bc,
-                f"数字BC_{len(digit_bc)}注.txt",
-                "track_bc"
-            )
-
-            shape_buckets=data[
-                "shape_buckets"
-            ]
-
-            shape_cd=data[
-                "shape_cd"
-            ]
-
-            st.markdown(
-                "## ③ 形态轨"
-            )
-
-            st.write(
-                "形态："
-                +
-                "、".join(
-                    s
-                    for s,_
-                    in data["valid_shapes"]
-                )
-            )
-
-            for count in sorted(
-                shape_buckets
-            ):
-
-                st.write(
-                    f"出现{count}次："
-                    f"**"
-                    f"{len(shape_buckets[count])}"
-                    f" 注**"
-                )
-
-            st.write(
-                f"形态CD（3次+4次）："
-                f"**{len(shape_cd)} 注**"
-            )
-
-            show_download(
-                "下载形态CD",
-                shape_cd,
-                f"形态CD_{len(shape_cd)}注.txt",
-                "track_cd"
-            )
-
-            final_in=data[
-                "final_in"
-            ]
-
-            final_out=data[
-                "final_out"
-            ]
-
-            st.markdown(
-                "## ④ 最终数字形态轨"
-            )
-
-            st.write(
-                f"最终入选 BC∩CD："
-                f"**{len(final_in)} 注**"
-            )
-
-            st.write(
-                f"最终不入选："
-                f"**{len(final_out)} 注**"
-            )
-
-            if (
-                len(final_in)
-                +
-                len(final_out)
-                ==
-                len(non_inter)
-            ):
-
-                st.success(
-                    f"最终闭环："
-                    f"{len(final_in)} + "
-                    f"{len(final_out)} = "
-                    f"{len(non_inter)} √"
-                )
-
-            show_download(
-                "下载最终入选",
-                final_in,
-                f"最终入选_{len(final_in)}注.txt",
-                "track_final_in"
-            )
-
-            show_download(
-                "下载最终不入选",
-                final_out,
-                f"最终不入选_{len(final_out)}注.txt",
-                "track_final_out"
-            )
-
-
-# =========================================================
-# 5. 交集 / 不交集
-# =========================================================
+            st.markdown("## ① 前置母号结果"); st.write(f"A三不同：**{len(d['A'])} 注**"); st.write(f"B三不同：**{len(d['B'])} 注**"); st.write(f"交集：**{len(d['inter'])} 注**"); st.write(f"A独有：**{len(d['ao'])} 注**"); st.write(f"B独有：**{len(d['bo'])} 注**"); st.write(f"不交集合并：**{len(d['non'])} 注**"); st.success(f"前置闭环：{len(d['A'])}+{len(d['B'])}=2×{len(d['inter'])}+{len(d['non'])} √")
+            for label,arr,k in [("下载A三不同",d["A"],"ta"),("下载B三不同",d["B"],"tb"),("下载交集",d["inter"],"ti"),("下载A独有",d["ao"],"tao"),("下载B独有",d["bo"],"tbo"),("下载不交集合并",d["non"],"tn")]: show_download(label,arr,f"{label.replace('下载','')}_{len(arr)}注.txt",k)
+            st.markdown("## ② 数字轨"); st.write("目标数字："+"、".join(d["digits"])); [st.write(f"出现{c}次：**{len(d['db'][c])} 注**") for c in sorted(d["db"])]; st.write(f"数字BC（2次+3次）：**{len(d['bc'])} 注**"); show_download("下载数字BC",d["bc"],f"数字BC_{len(d['bc'])}注.txt","tbc")
+            st.markdown("## ③ 形态轨"); st.write("形态："+"、".join(x for x,_ in d["vs"])); [st.write(f"出现{c}次：**{len(d['sb'][c])} 注**") for c in sorted(d["sb"])]; st.write(f"形态CD（3次+4次）：**{len(d['cd'])} 注**"); show_download("下载形态CD",d["cd"],f"形态CD_{len(d['cd'])}注.txt","tcd")
+            st.markdown("## ④ 最终数字形态轨"); st.write(f"最终入选 BC∩CD：**{len(d['fin'])} 注**"); st.write(f"最终不入选：**{len(d['fout'])} 注**"); st.success(f"最终闭环：{len(d['fin'])}+{len(d['fout'])}={len(d['non'])} √"); show_download("下载最终入选",d["fin"],f"最终入选_{len(d['fin'])}注.txt","tfi"); show_download("下载最终不入选",d["fout"],f"最终不入选_{len(d['fout'])}注.txt","tfo")
 
 elif mode=="交集 / 不交集":
-
-    st.subheader(
-        "两个附件交集 / 不交集"
-    )
-
-    with st.form(
-        "normal_intersection_form"
-    ):
-
-        file_a=st.file_uploader(
-            "上传文件A",
-            type=["txt"],
-            key="normal_a_file"
-        )
-
-        file_b=st.file_uploader(
-            "上传文件B",
-            type=["txt"],
-            key="normal_b_file"
-        )
-
-        submitted=st.form_submit_button(
-            "开始分析"
-        )
-
-    if submitted:
-
-        if (
-            file_a is None
-            or
-            file_b is None
-        ):
-
-            save_result(
-                "交集 / 不交集",
-                {
-                    "error":
-                    "请同时上传A和B附件"
-                }
-            )
-
+    st.subheader("两个附件交集 / 不交集")
+    with st.form("normal_inter"):
+        fa=st.file_uploader("上传文件A",type=["txt"],key="nia"); fb=st.file_uploader("上传文件B",type=["txt"],key="nib"); go=st.form_submit_button("开始分析")
+    if go:
+        if fa is None or fb is None: save_result(mode,{"error":"请同时上传A和B附件"})
         else:
-
-            A=set(
-                read_upload(file_a)
-            )
-
-            B=set(
-                read_upload(file_b)
-            )
-
-            inter=sorted(
-                A & B
-            )
-
-            a_only=sorted(
-                A - B
-            )
-
-            b_only=sorted(
-                B - A
-            )
-
-            non_inter=sorted(
-                (A - B)
-                |
-                (B - A)
-            )
-
-            union=sorted(
-                A | B
-            )
-
-            save_result(
-                "交集 / 不交集",
-                {
-                    "error":None,
-                    "A":sorted(A),
-                    "B":sorted(B),
-                    "inter":inter,
-                    "a_only":a_only,
-                    "b_only":b_only,
-                    "non_inter":non_inter,
-                    "union":union
-                }
-            )
-
-    data=get_result(
-        "交集 / 不交集"
-    )
-
-    if data:
-
-        if data.get("error"):
-
-            st.error(
-                data["error"]
-            )
-
-        elif "A" in data:
-
-            A=data["A"]
-            B=data["B"]
-
-            inter=data["inter"]
-            a_only=data["a_only"]
-            b_only=data["b_only"]
-            non_inter=data["non_inter"]
-            union=data["union"]
-
-            st.write(
-                f"A：**{len(A)} 注**"
-            )
-
-            st.write(
-                f"B：**{len(B)} 注**"
-            )
-
-            st.write(
-                f"交集："
-                f"**{len(inter)} 注**"
-            )
-
-            st.write(
-                f"A独有："
-                f"**{len(a_only)} 注**"
-            )
-
-            st.write(
-                f"B独有："
-                f"**{len(b_only)} 注**"
-            )
-
-            st.write(
-                f"不交集合并："
-                f"**{len(non_inter)} 注**"
-            )
-
-            st.write(
-                f"合并去重："
-                f"**{len(union)} 注**"
-            )
-
-            left=(
-                len(A)
-                +
-                len(B)
-            )
-
-            right=(
-                2*len(inter)
-                +
-                len(non_inter)
-            )
-
-            if left==right:
-
-                st.success(
-                    f"闭环："
-                    f"{len(A)} + "
-                    f"{len(B)} = "
-                    f"2×{len(inter)} + "
-                    f"{len(non_inter)} "
-                    f"= {left} √"
-                )
-
-            show_download(
-                "下载交集",
-                inter,
-                f"交集_{len(inter)}注.txt",
-                "normal_inter_dl"
-            )
-
-            show_download(
-                "下载A独有",
-                a_only,
-                f"A独有_{len(a_only)}注.txt",
-                "normal_a_only_dl"
-            )
-
-            show_download(
-                "下载B独有",
-                b_only,
-                f"B独有_{len(b_only)}注.txt",
-                "normal_b_only_dl"
-            )
-
-            show_download(
-                "下载不交集合并",
-                non_inter,
-                f"不交集合并_{len(non_inter)}注.txt",
-                "normal_non_dl"
-            )
-
-            show_download(
-                "下载合并去重",
-                union,
-                f"合并去重_{len(union)}注.txt",
-                "normal_union_dl"
-            )
-
-
-# =========================================================
-# 6. A分别与多个文件交集
-# =========================================================
+            A=set(read_upload(fa)); B=set(read_upload(fb)); save_result(mode,{"A":sorted(A),"B":sorted(B),"inter":sorted(A&B),"ao":sorted(A-B),"bo":sorted(B-A),"non":sorted((A-B)|(B-A)),"union":sorted(A|B)})
+    d=get_result(mode)
+    if d:
+        if d.get("error"): st.error(d["error"])
+        else:
+            st.write(f"A：**{len(d['A'])} 注**"); st.write(f"B：**{len(d['B'])} 注**"); st.write(f"交集：**{len(d['inter'])} 注**"); st.write(f"A独有：**{len(d['ao'])} 注**"); st.write(f"B独有：**{len(d['bo'])} 注**"); st.write(f"不交集合并：**{len(d['non'])} 注**"); st.write(f"合并去重：**{len(d['union'])} 注**"); st.success(f"闭环：{len(d['A'])}+{len(d['B'])}=2×{len(d['inter'])}+{len(d['non'])} √")
+            for label,arr,k in [("下载交集",d["inter"],"ni1"),("下载A独有",d["ao"],"ni2"),("下载B独有",d["bo"],"ni3"),("下载不交集合并",d["non"],"ni4"),("下载合并去重",d["union"],"ni5")]: show_download(label,arr,f"{label.replace('下载','')}_{len(arr)}注.txt",k)
 
 elif mode=="A分别与多个文件交集":
-
-    st.subheader(
-        "A分别与B / C / D / E...做交集"
-    )
-
-    with st.form(
-        "multi_inter_form"
-    ):
-
-        file_a=st.file_uploader(
-            "上传主文件A",
-            type=["txt"],
-            key="multi_a_file"
-        )
-
-        files=st.file_uploader(
-            "上传B / C / D / E...",
-            type=["txt"],
-            accept_multiple_files=True,
-            key="multi_other_files"
-        )
-
-        submitted=st.form_submit_button(
-            "开始分析"
-        )
-
-    if submitted:
-
-        if file_a is None:
-
-            save_result(
-                "A分别与多个文件交集",
-                {
-                    "error":
-                    "请上传主文件A"
-                }
-            )
-
-        elif not files:
-
-            save_result(
-                "A分别与多个文件交集",
-                {
-                    "error":
-                    "请至少上传一个比较附件"
-                }
-            )
-
+    st.subheader("A分别与B / C / D / E...做交集")
+    with st.form("multi_inter"):
+        fa=st.file_uploader("上传主文件A",type=["txt"],key="mia"); fs=st.file_uploader("上传B / C / D / E...",type=["txt"],accept_multiple_files=True,key="mio"); go=st.form_submit_button("开始分析")
+    if go:
+        if fa is None or not fs: save_result(mode,{"error":"请上传A和至少一个比较附件"})
         else:
-
-            A=set(
-                read_upload(file_a)
-            )
-
-            outputs=[]
-
-            for idx,f in enumerate(
-                files,
-                start=1
-            ):
-
-                B=set(
-                    read_upload(f)
-                )
-
-                label=chr(
-                    65+idx
-                )
-
-                inter=sorted(
-                    A & B
-                )
-
-                a_only=sorted(
-                    A - B
-                )
-
-                b_only=sorted(
-                    B - A
-                )
-
-                non_inter=sorted(
-                    (A - B)
-                    |
-                    (B - A)
-                )
-
-                outputs.append({
-                    "label":label,
-                    "filename":f.name,
-                    "A":sorted(A),
-                    "B":sorted(B),
-                    "inter":inter,
-                    "a_only":a_only,
-                    "b_only":b_only,
-                    "non_inter":non_inter
-                })
-
-            save_result(
-                "A分别与多个文件交集",
-                {
-                    "error":None,
-                    "outputs":outputs
-                }
-            )
-
-    data=get_result(
-        "A分别与多个文件交集"
-    )
-
-    if data:
-
-        if data.get("error"):
-
-            st.error(
-                data["error"]
-            )
-
+            A=set(read_upload(fa)); outs=[]
+            for i,f in enumerate(fs,1):
+                B=set(read_upload(f)); label=chr(65+i); outs.append({"label":label,"name":f.name,"A":sorted(A),"B":sorted(B),"inter":sorted(A&B),"ao":sorted(A-B),"bo":sorted(B-A),"non":sorted((A-B)|(B-A))})
+            save_result(mode,{"outs":outs})
+    d=get_result(mode)
+    if d:
+        if d.get("error"): st.error(d["error"])
         else:
-
-            for idx,item in enumerate(
-                data["outputs"],
-                start=1
-            ):
-
-                label=item["label"]
-
-                A=item["A"]
-                B=item["B"]
-
-                inter=item["inter"]
-                a_only=item["a_only"]
-                b_only=item["b_only"]
-                non_inter=item["non_inter"]
-
-                st.divider()
-
-                st.markdown(
-                    f"## A 与 {label}"
-                )
-
-                st.caption(
-                    f"{label}文件："
-                    f"{item['filename']}"
-                )
-
-                st.write(
-                    f"A：**{len(A)} 注**"
-                )
-
-                st.write(
-                    f"{label}："
-                    f"**{len(B)} 注**"
-                )
-
-                st.write(
-                    f"A∩{label}："
-                    f"**{len(inter)} 注**"
-                )
-
-                st.write(
-                    f"A独有："
-                    f"**{len(a_only)} 注**"
-                )
-
-                st.write(
-                    f"{label}独有："
-                    f"**{len(b_only)} 注**"
-                )
-
-                st.write(
-                    f"不交集合并："
-                    f"**{len(non_inter)} 注**"
-                )
-
-                left=(
-                    len(A)
-                    +
-                    len(B)
-                )
-
-                right=(
-                    2*len(inter)
-                    +
-                    len(non_inter)
-                )
-
-                if left==right:
-
-                    st.success(
-                        f"闭环："
-                        f"{left} = "
-                        f"{right} √"
-                    )
-
-                show_download(
-                    f"下载A∩{label}",
-                    inter,
-                    f"A与{label}交集_{len(inter)}注.txt",
-                    f"multi_inter_dl_{idx}"
-                )
-
-                show_download(
-                    f"下载A独有（相对{label}）",
-                    a_only,
-                    f"A对{label}独有_{len(a_only)}注.txt",
-                    f"multi_aonly_dl_{idx}"
-                )
-
-                show_download(
-                    f"下载{label}独有",
-                    b_only,
-                    f"{label}独有_{len(b_only)}注.txt",
-                    f"multi_bonly_dl_{idx}"
-                )
-
-                show_download(
-                    f"下载A与{label}不交集合并",
-                    non_inter,
-                    f"A与{label}不交集合并_{len(non_inter)}注.txt",
-                    f"multi_non_dl_{idx}"
-            )
-                # =========================================================
-# 7. 合并去重
-# =========================================================
+            for i,x in enumerate(d["outs"],1):
+                st.divider(); st.markdown(f"## A 与 {x['label']}"); st.caption(f"{x['label']}文件：{x['name']}"); st.write(f"A：**{len(x['A'])} 注**"); st.write(f"{x['label']}：**{len(x['B'])} 注**"); st.write(f"交集：**{len(x['inter'])} 注**"); st.write(f"A独有：**{len(x['ao'])} 注**"); st.write(f"{x['label']}独有：**{len(x['bo'])} 注**"); st.write(f"不交集合并：**{len(x['non'])} 注**"); st.success(f"闭环：{len(x['A'])}+{len(x['B'])}=2×{len(x['inter'])}+{len(x['non'])} √")
+                for label,arr,s in [(f"下载A∩{x['label']}",x["inter"],"i"),("下载A独有",x["ao"],"a"),(f"下载{x['label']}独有",x["bo"],"b"),("下载不交集合并",x["non"],"n")]: show_download(label,arr,f"{label.replace('下载','')}_{len(arr)}注.txt",f"mi{i}{s}")
 
 elif mode=="合并去重":
-
-    st.subheader(
-        "多个附件合并去重"
-    )
-
-    with st.form(
-        "merge_form"
-    ):
-
-        files=st.file_uploader(
-            "上传两个或多个TXT",
-            type=["txt"],
-            accept_multiple_files=True,
-            key="merge_files"
-        )
-
-        submitted=st.form_submit_button(
-            "开始合并去重"
-        )
-
-    if submitted:
-
-        if (
-            not files
-            or
-            len(files)<2
-        ):
-
-            save_result(
-                "合并去重",
-                {
-                    "error":
-                    "请至少上传两个附件"
-                }
-            )
-
+    st.subheader("多个附件合并去重")
+    with st.form("merge"):
+        fs=st.file_uploader("上传两个或多个TXT",type=["txt"],accept_multiple_files=True,key="mergef"); go=st.form_submit_button("开始合并去重")
+    if go:
+        if not fs or len(fs)<2: save_result(mode,{"error":"请至少上传两个附件"})
         else:
-
-            sets=[]
-            details=[]
-            total=0
-
-            for f in files:
-
-                nums=set(
-                    read_upload(f)
-                )
-
-                sets.append(
-                    nums
-                )
-
-                details.append({
-                    "name":f.name,
-                    "count":len(nums)
-                })
-
-                total+=len(nums)
-
-            merged=sorted(
-                set().union(
-                    *sets
-                )
-            )
-
-            duplicate=(
-                total
-                -
-                len(merged)
-            )
-
-            save_result(
-                "合并去重",
-                {
-                    "error":None,
-                    "details":details,
-                    "total":total,
-                    "duplicate":duplicate,
-                    "merged":merged
-                }
-            )
-
-    data=get_result(
-        "合并去重"
-    )
-
-    if data:
-
-        if data.get("error"):
-
-            st.error(
-                data["error"]
-            )
-
+            sets=[]; details=[]; total=0
+            for f in fs:
+                s=set(read_upload(f)); sets.append(s); details.append((f.name,len(s))); total+=len(s)
+            merged=sorted(set().union(*sets)); save_result(mode,{"details":details,"total":total,"dup":total-len(merged),"merged":merged})
+    d=get_result(mode)
+    if d:
+        if d.get("error"): st.error(d["error"])
         else:
-
-            for item in data["details"]:
-
-                st.write(
-                    f"{item['name']}："
-                    f"**{item['count']} 注**"
-                )
-
-            st.write(
-                f"累计："
-                f"**{data['total']} 注**"
-            )
-
-            st.write(
-                f"合并去重："
-                f"**{len(data['merged'])} 注**"
-            )
-
-            st.write(
-                f"重复计数："
-                f"**{data['duplicate']}**"
-            )
-
-            st.success(
-                f"闭环："
-                f"{data['total']} - "
-                f"{data['duplicate']} = "
-                f"{len(data['merged'])} √"
-            )
-
-            show_download(
-                "下载合并去重",
-                data["merged"],
-                f"合并去重_{len(data['merged'])}注.txt",
-                "merge_dl"
-            )
-
-
-# =========================================================
-# 8. 形态筛选
-# =========================================================
+            [st.write(f"{n}：**{c} 注**") for n,c in d["details"]]; st.write(f"累计：**{d['total']} 注**"); st.write(f"合并去重：**{len(d['merged'])} 注**"); st.write(f"重复计数：**{d['dup']}**"); st.success(f"闭环：{d['total']}-{d['dup']}={len(d['merged'])} √"); show_download("下载合并去重",d["merged"],f"合并去重_{len(d['merged'])}注.txt","merge_dl")
 
 elif mode=="形态筛选":
-
-    st.subheader(
-        "按完整三位形态删除"
-    )
-
-    with st.form(
-        "shape_filter_form"
-    ):
-
-        file=st.file_uploader(
-            "上传基础附件",
-            type=["txt"],
-            key="shape_filter_file"
-        )
-
-        selected_size=st.multiselect(
-            "要去掉的大小形态",
-            SIZE_SHAPES
-        )
-
-        selected_parity=st.multiselect(
-            "要去掉的奇偶形态",
-            PARITY_SHAPES
-        )
-
-        submitted=st.form_submit_button(
-            "开始筛选"
-        )
-
-    if submitted:
-
-        if file is None:
-
-            save_result(
-                "形态筛选",
-                {
-                    "error":
-                    "请上传附件"
-                }
-            )
-
+    st.subheader("按完整三位形态删除")
+    with st.form("shape_filter"):
+        f=st.file_uploader("上传基础附件",type=["txt"],key="sff"); ss=st.multiselect("要去掉的大小形态",SIZE_SHAPES); ps=st.multiselect("要去掉的奇偶形态",PARITY_SHAPES); go=st.form_submit_button("开始筛选")
+    if go:
+        if f is None: save_result(mode,{"error":"请上传附件"})
         else:
-
-            original=read_upload(
-                file
-            )
-
-            remain=[]
-            removed=[]
-
-            for num in original:
-
-                remove=(
-                    size_shape(num)
-                    in selected_size
-                    or
-                    parity_shape(num)
-                    in selected_parity
-                )
-
-                if remove:
-                    removed.append(
-                        num
-                    )
-
-                else:
-                    remain.append(
-                        num
-                    )
-
-            save_result(
-                "形态筛选",
-                {
-                    "error":None,
-                    "original":original,
-                    "remain":sorted(remain),
-                    "removed":sorted(removed)
-                }
-            )
-
-    data=get_result(
-        "形态筛选"
-    )
-
-    if data:
-
-        if data.get("error"):
-
-            st.error(
-                data["error"]
-            )
-
+            o=read_upload(f); rem=[]; rm=[]
+            for n in o: (rm if size_shape(n) in ss or parity_shape(n) in ps else rem).append(n)
+            save_result(mode,{"o":o,"rem":sorted(rem),"rm":sorted(rm)})
+    d=get_result(mode)
+    if d:
+        if d.get("error"): st.error(d["error"])
         else:
-
-            original=data[
-                "original"
-            ]
-
-            remain=data[
-                "remain"
-            ]
-
-            removed=data[
-                "removed"
-            ]
-
-            st.write(
-                f"原始："
-                f"**{len(original)} 注**"
-            )
-
-            st.write(
-                f"剩余："
-                f"**{len(remain)} 注**"
-            )
-
-            st.write(
-                f"去掉："
-                f"**{len(removed)} 注**"
-            )
-
-            if (
-                len(remain)
-                +
-                len(removed)
-                ==
-                len(original)
-            ):
-
-                st.success(
-                    f"闭环："
-                    f"{len(remain)} + "
-                    f"{len(removed)} = "
-                    f"{len(original)} √"
-                )
-
-            show_download(
-                "下载剩余组合",
-                remain,
-                f"剩余_{len(remain)}注.txt",
-                "shape_remain_dl"
-            )
-
-            show_download(
-                "下载被去掉组合",
-                removed,
-                f"被去掉_{len(removed)}注.txt",
-                "shape_removed_dl"
-            )
-
-
-# =========================================================
-# 9. 二同 / 三同 / 三不同
-# =========================================================
+            st.write(f"原始：**{len(d['o'])} 注**"); st.write(f"剩余：**{len(d['rem'])} 注**"); st.write(f"去掉：**{len(d['rm'])} 注**"); st.success(f"闭环：{len(d['rem'])}+{len(d['rm'])}={len(d['o'])} √"); show_download("下载剩余组合",d["rem"],f"剩余_{len(d['rem'])}注.txt","sfr"); show_download("下载被去掉组合",d["rm"],f"被去掉_{len(d['rm'])}注.txt","sfx")
 
 elif mode=="二同 / 三同 / 三不同":
-
-    st.subheader(
-        "二同 / 三同 / 三不同分类"
-    )
-
-    with st.form(
-        "repeat_form"
-    ):
-
-        file=st.file_uploader(
-            "上传附件",
-            type=["txt"],
-            key="repeat_file"
-        )
-
-        submitted=st.form_submit_button(
-            "开始分类"
-        )
-
-    if submitted:
-
-        if file is None:
-
-            save_result(
-                "二同 / 三同 / 三不同",
-                {
-                    "error":
-                    "请上传附件"
-                }
-            )
-
+    st.subheader("二同 / 三同 / 三不同分类")
+    with st.form("repeat"):
+        f=st.file_uploader("上传附件",type=["txt"],key="repf"); go=st.form_submit_button("开始分类")
+    if go:
+        if f is None: save_result(mode,{"error":"请上传附件"})
         else:
-
-            original=read_upload(
-                file
-            )
-
-            two=[]
-            three=[]
-            different=[]
-
-            for num in original:
-
-                tp=repeat_type(
-                    num
-                )
-
-                if tp=="二同":
-
-                    two.append(
-                        num
-                    )
-
-                elif tp=="三同":
-
-                    three.append(
-                        num
-                    )
-
-                else:
-
-                    different.append(
-                        num
-                    )
-
-            same23=sorted(
-                two
-                +
-                three
-            )
-
-            save_result(
-                "二同 / 三同 / 三不同",
-                {
-                    "error":None,
-                    "original":original,
-                    "two":sorted(two),
-                    "three":sorted(three),
-                    "same23":same23,
-                    "different":sorted(different)
-                }
-            )
-
-    data=get_result(
-        "二同 / 三同 / 三不同"
-    )
-
-    if data:
-
-        if data.get("error"):
-
-            st.error(
-                data["error"]
-            )
-
+            o=read_upload(f); two=[n for n in o if repeat_type(n)=="二同"]; three=[n for n in o if repeat_type(n)=="三同"]; diff=[n for n in o if repeat_type(n)=="三不同"]; save_result(mode,{"o":o,"two":two,"three":three,"same":sorted(two+three),"diff":diff})
+    d=get_result(mode)
+    if d:
+        if d.get("error"): st.error(d["error"])
         else:
+            st.write(f"原始：**{len(d['o'])} 注**"); st.write(f"二同：**{len(d['two'])} 注**"); st.write(f"三同：**{len(d['three'])} 注**"); st.write(f"二同+三同：**{len(d['same'])} 注**"); st.write(f"三不同：**{len(d['diff'])} 注**"); st.success(f"闭环：{len(d['same'])}+{len(d['diff'])}={len(d['o'])} √")
+            for label,arr,k in [("下载二同+三同",d["same"],"r1"),("下载三不同",d["diff"],"r2"),("单独下载二同",d["two"],"r3"),("单独下载三同",d["three"],"r4")]: show_download(label,arr,f"{label.replace('下载','')}_{len(arr)}注.txt",k)
 
-            original=data[
-                "original"
-            ]
-
-            two=data[
-                "two"
-            ]
-
-            three=data[
-                "three"
-            ]
-
-            same23=data[
-                "same23"
-            ]
-
-            different=data[
-                "different"
-            ]
-
-            st.write(
-                f"原始："
-                f"**{len(original)} 注**"
-            )
-
-            st.write(
-                f"二同："
-                f"**{len(two)} 注**"
-            )
-
-            st.write(
-                f"三同："
-                f"**{len(three)} 注**"
-            )
-
-            st.write(
-                f"二同+三同："
-                f"**{len(same23)} 注**"
-            )
-
-            st.write(
-                f"三不同："
-                f"**{len(different)} 注**"
-            )
-
-            if (
-                len(same23)
-                +
-                len(different)
-                ==
-                len(original)
-            ):
-
-                st.success(
-                    f"闭环："
-                    f"{len(same23)} + "
-                    f"{len(different)} = "
-                    f"{len(original)} √"
-                )
-
-            show_download(
-                "下载二同+三同",
-                same23,
-                f"二同三同_{len(same23)}注.txt",
-                "repeat_same_dl"
-            )
-
-            show_download(
-                "下载三不同",
-                different,
-                f"三不同_{len(different)}注.txt",
-                "repeat_diff_dl"
-            )
-
-            show_download(
-                "单独下载二同",
-                two,
-                f"二同_{len(two)}注.txt",
-                "repeat_two_dl"
-            )
-
-            show_download(
-                "单独下载三同",
-                three,
-                f"三同_{len(three)}注.txt",
-                "repeat_three_dl"
-            )
-
-
-# =========================================================
-# 10. 两位组合命中筛选（按附件）
-# =========================================================
-
-elif mode=="两位组合命中筛选（按附件）":
-
-    st.subheader(
-        "附件 + 两位组合条件"
-    )
-
-    with st.form(
-        "pair_file_form"
-    ):
-
-        file=st.file_uploader(
-            "上传基础附件",
-            type=["txt"],
-            key="pair_base_file"
-        )
-
-        pair_text=st.text_area(
-            "输入两位组合",
-            placeholder=(
-                "01 03 05 06 09 13 15 16 18 19\n"
-                "34 35 36 37 38 39 48 49 56 58"
-            ),
-            height=170
-        )
-
-        pair_mode=st.radio(
-            "筛选方式",
-            [
-                "两对命中（至少2对）",
-                "恰好两对命中",
-                "三对全命中"
-            ],
-            key="pair_file_mode"
-        )
-
-        submitted=st.form_submit_button(
-            "开始筛选"
-        )
-
-    if submitted:
-
-        if file is None:
-
-            save_result(
-                "两位组合命中筛选（按附件）",
-                {
-                    "error":
-                    "请上传基础附件"
-                }
-            )
-
+elif mode in ["两位组合命中筛选（按附件）","两位组合命中筛选（000-999）"]:
+    by_file=mode.endswith("按附件）")
+    st.subheader("附件 + 两位组合条件" if by_file else "000-999 + 两位组合条件")
+    with st.form("pairf"+str(by_file)):
+        f=st.file_uploader("上传基础附件",type=["txt"],key="pairupload") if by_file else None
+        txt=st.text_area("输入两位组合",placeholder="01 03 05 06 09 13 15 16 18 19\n34 35 36 37 38 39 48 49 56 58",height=170)
+        pm=st.radio("筛选方式",["两对命中（至少2对）","恰好两对命中","三对全命中"],key="pairmode"+str(by_file)); go=st.form_submit_button("开始筛选")
+    if go:
+        if by_file and f is None: save_result(mode,{"error":"请上传基础附件"})
         else:
-
-            pairs=parse_pair_conditions(
-                pair_text
-            )
-
-            if not pairs:
-
-                save_result(
-                    "两位组合命中筛选（按附件）",
-                    {
-                        "error":
-                        "请输入两位组合条件"
-                    }
-                )
-
+            pairs=parse_pair_conditions(txt)
+            if not pairs: save_result(mode,{"error":"请输入两位组合条件"})
             else:
-
-                original=read_upload(
-                    file
-                )
-
-                selected,rejected=(
-                    run_pair_filter(
-                        original,
-                        pairs,
-                        pair_mode
-                    )
-                )
-
-                same23=[
-                    n
-                    for n in selected
-                    if repeat_type(n)
-                    !="三不同"
-                ]
-
-                different=[
-                    n
-                    for n in selected
-                    if repeat_type(n)
-                    =="三不同"
-                ]
-
-                save_result(
-                    "两位组合命中筛选（按附件）",
-                    {
-                        "error":None,
-                        "original":original,
-                        "selected":selected,
-                        "rejected":rejected,
-                        "same23":sorted(same23),
-                        "different":sorted(different),
-                        "pair_count":len(pairs),
-                        "pair_mode":pair_mode
-                    }
-                )
-
-    data=get_result(
-        "两位组合命中筛选（按附件）"
-    )
-
-    if data:
-
-        if data.get("error"):
-
-            st.error(
-                data["error"]
-            )
-
+                base=read_upload(f) if by_file else ALL_NUMBERS; sel,rej=run_pair_filter(base,pairs,pm); same=[n for n in sel if repeat_type(n)!="三不同"]; diff=[n for n in sel if repeat_type(n)=="三不同"]; save_result(mode,{"base":base,"sel":sel,"rej":rej,"same":same,"diff":diff,"pc":len(pairs),"pm":pm})
+    d=get_result(mode)
+    if d:
+        if d.get("error"): st.error(d["error"])
         else:
-
-            original=data[
-                "original"
-            ]
-
-            selected=data[
-                "selected"
-            ]
-
-            rejected=data[
-                "rejected"
-            ]
-
-            same23=data[
-                "same23"
-            ]
-
-            different=data[
-                "different"
-            ]
-
-            st.write(
-                f"两位条件："
-                f"**{data['pair_count']}组**"
-            )
-
-            st.write(
-                f"模式："
-                f"**{data['pair_mode']}**"
-            )
-
-            st.write(
-                f"原附件："
-                f"**{len(original)} 注**"
-            )
-
-            st.write(
-                f"符合："
-                f"**{len(selected)} 注**"
-            )
-
-            st.write(
-                f"不符合："
-                f"**{len(rejected)} 注**"
-            )
-
-            st.write(
-                f"符合中的二同+三同："
-                f"**{len(same23)} 注**"
-            )
-
-            st.write(
-                f"符合中的三不同："
-                f"**{len(different)} 注**"
-            )
-
-            if (
-                len(selected)
-                +
-                len(rejected)
-                ==
-                len(original)
-            ):
-
-                st.success(
-                    f"总闭环："
-                    f"{len(selected)} + "
-                    f"{len(rejected)} = "
-                    f"{len(original)} √"
-                )
-
-            if (
-                len(same23)
-                +
-                len(different)
-                ==
-                len(selected)
-            ):
-
-                st.success(
-                    f"分类闭环："
-                    f"{len(same23)} + "
-                    f"{len(different)} = "
-                    f"{len(selected)} √"
-                )
-
-            show_download(
-                "下载符合条件全量",
-                selected,
-                f"两位命中_符合_{len(selected)}注.txt",
-                "pair_file_selected_dl"
-            )
-
-            show_download(
-                "下载不符合条件",
-                rejected,
-                f"两位命中_不符合_{len(rejected)}注.txt",
-                "pair_file_rejected_dl"
-            )
-
-            show_download(
-                "下载二同+三同",
-                same23,
-                f"两位命中_二同三同_{len(same23)}注.txt",
-                "pair_file_same_dl"
-            )
-
-            show_download(
-                "下载三不同",
-                different,
-                f"两位命中_三不同_{len(different)}注.txt",
-                "pair_file_diff_dl"
-        )
-            # =========================================================
-# 11. 两位组合命中筛选（000-999）
-# =========================================================
-
-elif mode=="两位组合命中筛选（000-999）":
-
-    st.subheader(
-        "000-999 + 两位组合条件"
-    )
-
-    with st.form(
-        "pair_all_form"
-    ):
-
-        pair_text=st.text_area(
-            "输入两位组合",
-            placeholder=(
-                "01 03 05 06 09 13 15 16 18 19\n"
-                "34 35 36 37 38 39 48 49 56 58"
-            ),
-            height=170
-        )
-
-        pair_mode=st.radio(
-            "筛选方式",
-            [
-                "两对命中（至少2对）",
-                "恰好两对命中",
-                "三对全命中"
-            ],
-            key="pair_all_mode"
-        )
-
-        submitted=st.form_submit_button(
-            "开始筛选"
-        )
-
-    if submitted:
-
-        pairs=parse_pair_conditions(
-            pair_text
-        )
-
-        if not pairs:
-
-            save_result(
-                "两位组合命中筛选（000-999）",
-                {
-                    "error":
-                    "请输入两位组合条件"
-                }
-            )
-
-        else:
-
-            original=ALL_NUMBERS
-
-            selected,rejected=(
-                run_pair_filter(
-                    original,
-                    pairs,
-                    pair_mode
-                )
-            )
-
-            same23=[
-                n
-                for n in selected
-                if repeat_type(n)
-                !="三不同"
-            ]
-
-            different=[
-                n
-                for n in selected
-                if repeat_type(n)
-                =="三不同"
-            ]
-
-            save_result(
-                "两位组合命中筛选（000-999）",
-                {
-                    "error":None,
-                    "original":original,
-                    "selected":selected,
-                    "rejected":rejected,
-                    "same23":sorted(same23),
-                    "different":sorted(different),
-                    "pair_count":len(pairs),
-                    "pair_mode":pair_mode
-                }
-            )
-
-    data=get_result(
-        "两位组合命中筛选（000-999）"
-    )
-
-    if data:
-
-        if data.get("error"):
-
-            st.error(
-                data["error"]
-            )
-
-        else:
-
-            original=data[
-                "original"
-            ]
-
-            selected=data[
-                "selected"
-            ]
-
-            rejected=data[
-                "rejected"
-            ]
-
-            same23=data[
-                "same23"
-            ]
-
-            different=data[
-                "different"
-            ]
-
-            st.write(
-                f"两位条件："
-                f"**{data['pair_count']}组**"
-            )
-
-            st.write(
-                f"模式："
-                f"**{data['pair_mode']}**"
-            )
-
-            st.write(
-                f"000-999全量："
-                f"**{len(original)} 注**"
-            )
-
-            st.write(
-                f"符合："
-                f"**{len(selected)} 注**"
-            )
-
-            st.write(
-                f"不符合："
-                f"**{len(rejected)} 注**"
-            )
-
-            st.write(
-                f"符合中的二同+三同："
-                f"**{len(same23)} 注**"
-            )
-
-            st.write(
-                f"符合中的三不同："
-                f"**{len(different)} 注**"
-            )
-
-            if (
-                len(selected)
-                +
-                len(rejected)
-                ==
-                len(original)
-            ):
-
-                st.success(
-                    f"总闭环："
-                    f"{len(selected)} + "
-                    f"{len(rejected)} = "
-                    f"{len(original)} √"
-                )
-
-            if (
-                len(same23)
-                +
-                len(different)
-                ==
-                len(selected)
-            ):
-
-                st.success(
-                    f"分类闭环："
-                    f"{len(same23)} + "
-                    f"{len(different)} = "
-                    f"{len(selected)} √"
-                )
-
-            show_download(
-                "下载符合条件全量",
-                selected,
-                f"000-999两位命中_符合_{len(selected)}注.txt",
-                "pair_all_selected_dl"
-            )
-
-            show_download(
-                "下载不符合条件",
-                rejected,
-                f"000-999两位命中_不符合_{len(rejected)}注.txt",
-                "pair_all_rejected_dl"
-            )
-
-            show_download(
-                "下载二同+三同",
-                same23,
-                f"000-999两位命中_二同三同_{len(same23)}注.txt",
-                "pair_all_same_dl"
-            )
-
-            show_download(
-                "下载三不同",
-                different,
-                f"000-999两位命中_三不同_{len(different)}注.txt",
-                "pair_all_diff_dl"
-            )
-
-
-# =========================================================
-# 12. 数字包含 / 去除筛选
-# =========================================================
+            st.write(f"两位条件：**{d['pc']}组**"); st.write(f"模式：**{d['pm']}**"); st.write(f"原始：**{len(d['base'])} 注**"); st.write(f"符合：**{len(d['sel'])} 注**"); st.write(f"不符合：**{len(d['rej'])} 注**"); st.write(f"二同+三同：**{len(d['same'])} 注**"); st.write(f"三不同：**{len(d['diff'])} 注**"); st.success(f"总闭环：{len(d['sel'])}+{len(d['rej'])}={len(d['base'])} √"); st.success(f"分类闭环：{len(d['same'])}+{len(d['diff'])}={len(d['sel'])} √")
+            for label,arr,k in [("下载符合条件全量",d["sel"],"p1"),("下载不符合条件",d["rej"],"p2"),("下载二同+三同",d["same"],"p3"),("下载三不同",d["diff"],"p4")]: show_download(label,arr,f"{label.replace('下载','')}_{len(arr)}注.txt",k+str(by_file))
 
 elif mode=="数字包含 / 去除筛选":
-
-    st.subheader(
-        "按数字包含关系筛选"
-    )
-
-    with st.form(
-        "digit_filter_form"
-    ):
-
-        file=st.file_uploader(
-            "上传基础附件",
-            type=["txt"],
-            key="digit_filter_file"
-        )
-
-        digit_text=st.text_input(
-            "输入一个或多个数字",
-            placeholder="例如：8 或 368"
-        )
-
-        match_mode=st.radio(
-            "多个数字如何判断",
-            [
-                "含任意一个",
-                "必须同时含全部"
-            ]
-        )
-
-        action=st.radio(
-            "操作方式",
-            [
-                "筛出符合条件的组合",
-                "去掉符合条件的组合"
-            ]
-        )
-
-        submitted=st.form_submit_button(
-            "开始数字筛选"
-        )
-
-    if submitted:
-
-        if file is None:
-
-            save_result(
-                "数字包含 / 去除筛选",
-                {
-                    "error":
-                    "请上传基础附件"
-                }
-            )
-
+    st.subheader("按数字包含关系筛选")
+    with st.form("digit_filter"):
+        f=st.file_uploader("上传基础附件",type=["txt"],key="dff"); txt=st.text_input("输入数字",placeholder="例如：3 或 368"); mm=st.radio("多个数字如何判断",["含任意一个","必须同时含全部"]); action=st.radio("操作方式",["筛出符合条件的组合","去掉符合条件的组合"]); go=st.form_submit_button("开始数字筛选")
+    if go:
+        if f is None: save_result(mode,{"error":"请上传基础附件"})
         else:
-
             digits=[]
-
-            for c in digit_text:
-
-                if (
-                    c.isdigit()
-                    and
-                    c not in digits
-                ):
-
-                    digits.append(
-                        c
-                    )
-
-            if not digits:
-
-                save_result(
-                    "数字包含 / 去除筛选",
-                    {
-                        "error":
-                        "请输入要筛选的数字"
-                    }
-                )
-
+            for c in txt:
+                if c.isdigit() and c not in digits: digits.append(c)
+            if not digits: save_result(mode,{"error":"请输入数字"})
             else:
-
-                original=read_upload(
-                    file
-                )
-
-                matched=[]
-                unmatched=[]
-
-                for num in original:
-
-                    if match_mode=="含任意一个":
-
-                        ok=any(
-                            d in num
-                            for d in digits
-                        )
-
-                    else:
-
-                        ok=all(
-                            d in num
-                            for d in digits
-                        )
-
-                    if ok:
-
-                        matched.append(
-                            num
-                        )
-
-                    else:
-
-                        unmatched.append(
-                            num
-                        )
-
-                if action=="筛出符合条件的组合":
-
-                    result=matched
-                    other=unmatched
-
-                    result_name="符合条件"
-                    other_name="不符合条件"
-
-                else:
-
-                    result=unmatched
-                    other=matched
-
-                    result_name="去掉后剩余"
-                    other_name="被去掉"
-
-                save_result(
-                    "数字包含 / 去除筛选",
-                    {
-                        "error":None,
-                        "original":original,
-                        "result":sorted(result),
-                        "other":sorted(other),
-                        "result_name":result_name,
-                        "other_name":other_name,
-                        "digits":digits,
-                        "match_mode":match_mode,
-                        "action":action
-                    }
-                )
-
-    data=get_result(
-        "数字包含 / 去除筛选"
-    )
-
-    if data:
-
-        if data.get("error"):
-
-            st.error(
-                data["error"]
-            )
-
+                o=read_upload(f); matched=[]; unmatched=[]
+                for n in o:
+                    ok=any(d in n for d in digits) if mm=="含任意一个" else all(d in n for d in digits)
+                    (matched if ok else unmatched).append(n)
+                if action=="筛出符合条件的组合": rem,rm,rn,xn=matched,unmatched,"符合条件","不符合条件"
+                else: rem,rm,rn,xn=unmatched,matched,"去掉后剩余","被去掉"
+                save_result(mode,{"o":o,"rem":sorted(rem),"rm":sorted(rm),"rn":rn,"xn":xn,"digits":digits,"mm":mm,"action":action})
+    d=get_result(mode)
+    if d:
+        if d.get("error"): st.error(d["error"])
         else:
+            st.write("数字："+"、".join(d["digits"])); st.write(f"判断：**{d['mm']}**"); st.write(f"操作：**{d['action']}**"); st.write(f"原始：**{len(d['o'])} 注**"); st.write(f"{d['rn']}：**{len(d['rem'])} 注**"); st.write(f"{d['xn']}：**{len(d['rm'])} 注**"); st.success(f"闭环：{len(d['rem'])}+{len(d['rm'])}={len(d['o'])} √"); show_download(f"下载{d['rn']}",d["rem"],f"{d['rn']}_{len(d['rem'])}注.txt","dfr"); show_download(f"下载{d['xn']}",d["rm"],f"{d['xn']}_{len(d['rm'])}注.txt","dfx")
 
-            original=data[
-                "original"
-            ]
+elif mode=="三至七位拆两位组合":
+    st.subheader("三至七位数字 → 拆成两位组合")
+    st.caption("例如：345 → 34 35 45；4567 → 45 46 47 56 57 67。每个两位组合内部按升序标准化，并自动去重。")
 
-            result=data[
-                "result"
-            ]
+    with st.form("split_pairs_form"):
+        text=st.text_area(
+            "输入3-7位数字（可输入多组）",
+            placeholder="345\n4567\n012579",
+            height=160
+        )
+        go=st.form_submit_button("开始拆分")
 
-            other=data[
-                "other"
-            ]
+    if go:
+        tokens=parse_split_inputs(text)
+        if not tokens:
+            save_result(mode,{"error":"请输入3位、4位、5位、6位或7位数字"})
+        else:
+            details=[]
+            merged=set()
+            for token in tokens:
+                pairs=split_to_pairs(token)
+                merged.update(pairs)
+                details.append({"token":token,"pairs":pairs})
+            save_result(mode,{
+                "error":None,
+                "details":details,
+                "merged":sorted(merged)
+            })
 
-            st.write(
-                "数字："
-                +
-                "、".join(
-                    data["digits"]
-                )
-            )
-
-            st.write(
-                f"判断方式："
-                f"**{data['match_mode']}**"
-            )
-
-            st.write(
-                f"操作："
-                f"**{data['action']}**"
-            )
-
-            st.write(
-                f"原始："
-                f"**{len(original)} 注**"
-            )
-
-            st.write(
-                f"{data['result_name']}："
-                f"**{len(result)} 注**"
-            )
-
-            st.write(
-                f"{data['other_name']}："
-                f"**{len(other)} 注**"
-            )
-
-            if (
-                len(result)
-                +
-                len(other)
-                ==
-                len(original)
-            ):
-
-                st.success(
-                    f"闭环："
-                    f"{len(result)} + "
-                    f"{len(other)} = "
-                    f"{len(original)} √"
+    d=get_result(mode)
+    if d:
+        if d.get("error"):
+            st.error(d["error"])
+        else:
+            for i,item in enumerate(d["details"],1):
+                st.divider()
+                st.markdown(f"## {item['token']}")
+                st.write(f"拆出：**{len(item['pairs'])} 组**")
+                st.code(" ".join(item["pairs"]))
+                show_download(
+                    f"下载 {item['token']} 的两位组合",
+                    item["pairs"],
+                    f"{item['token']}_拆两位_{len(item['pairs'])}组.txt",
+                    f"split_pair_{i}"
                 )
 
-            show_download(
-                f"下载{data['result_name']}",
-                result,
-                f"{data['result_name']}_{len(result)}注.txt",
-                "digit_result_dl"
-            )
-
-            show_download(
-                f"下载{data['other_name']}",
-                other,
-                f"{data['other_name']}_{len(other)}注.txt",
-                "digit_other_dl"
-            )
-
-
-# =========================================================
-# 13. 半顺以上筛选
-# =========================================================
+            if len(d["details"])>1:
+                st.divider()
+                st.markdown("## 多组输入合并去重")
+                st.write(f"合并去重后：**{len(d['merged'])} 组**")
+                st.code(" ".join(d["merged"]))
+                show_download(
+                    "下载合并去重后的两位组合",
+                    d["merged"],
+                    f"多组拆两位_合并去重_{len(d['merged'])}组.txt",
+                    "split_pair_merged"
+                )
 
 elif mode=="半顺以上筛选":
-
-    st.subheader(
-        "半顺 / 全顺筛选"
-    )
-
-    st.caption(
-        "例如：348、384属于半顺；"
-        "345及其排列属于全顺。"
-    )
-
-    with st.form(
-        "sequence_form"
-    ):
-
-        file=st.file_uploader(
-            "上传基础附件",
-            type=["txt"],
-            key="sequence_file"
-        )
-
-        submitted=st.form_submit_button(
-            "开始筛选"
-        )
-
-    if submitted:
-
-        if file is None:
-
-            save_result(
-                "半顺以上筛选",
-                {
-                    "error":
-                    "请上传基础附件"
-                }
-            )
-
+    st.subheader("附件 → 半顺 / 全顺"); st.caption("348、384属于半顺；345及其排列属于全顺。")
+    with st.form("seq"):
+        f=st.file_uploader("上传基础附件",type=["txt"],key="seqf"); go=st.form_submit_button("开始筛选")
+    if go:
+        if f is None: save_result(mode,{"error":"请上传基础附件"})
         else:
-
-            original=read_upload(
-                file
-            )
-
-            half=[
-                n
-                for n in original
-                if sequence_type(n)
-                =="半顺"
-            ]
-
-            full=[
-                n
-                for n in original
-                if sequence_type(n)
-                =="全顺"
-            ]
-
-            non=[
-                n
-                for n in original
-                if sequence_type(n)
-                =="非半顺"
-            ]
-
-            half_or_more=sorted(
-                half
-                +
-                full
-            )
-
-            save_result(
-                "半顺以上筛选",
-                {
-                    "error":None,
-                    "original":original,
-                    "half":sorted(half),
-                    "full":sorted(full),
-                    "half_or_more":half_or_more,
-                    "non":sorted(non)
-                }
-            )
-
-    data=get_result(
-        "半顺以上筛选"
-    )
-
-    if data:
-
-        if data.get("error"):
-
-            st.error(
-                data["error"]
-            )
-
+            o=read_upload(f); half=[n for n in o if sequence_type(n)=="半顺"]; full=[n for n in o if sequence_type(n)=="全顺"]; non=[n for n in o if sequence_type(n)=="非半顺"]; hm=sorted(half+full); save_result(mode,{"o":o,"half":half,"full":full,"hm":hm,"non":non})
+    d=get_result(mode)
+    if d:
+        if d.get("error"): st.error(d["error"])
         else:
-
-            original=data[
-                "original"
-            ]
-
-            half=data[
-                "half"
-            ]
-
-            full=data[
-                "full"
-            ]
-
-            half_or_more=data[
-                "half_or_more"
-            ]
-
-            non=data[
-                "non"
-            ]
-
-            st.write(
-                f"原始："
-                f"**{len(original)} 注**"
-            )
-
-            st.write(
-                f"半顺："
-                f"**{len(half)} 注**"
-            )
-
-            st.write(
-                f"全顺："
-                f"**{len(full)} 注**"
-            )
-
-            st.write(
-                f"半顺以上："
-                f"**{len(half_or_more)} 注**"
-            )
-
-            st.write(
-                f"非半顺以上："
-                f"**{len(non)} 注**"
-            )
-
-            if (
-                len(half)
-                +
-                len(full)
-                ==
-                len(half_or_more)
-            ):
-
-                st.success(
-                    f"分类闭环1："
-                    f"{len(half)} + "
-                    f"{len(full)} = "
-                    f"{len(half_or_more)} √"
-                )
-
-            if (
-                len(half_or_more)
-                +
-                len(non)
-                ==
-                len(original)
-            ):
-
-                st.success(
-                    f"分类闭环2："
-                    f"{len(half_or_more)} + "
-                    f"{len(non)} = "
-                    f"{len(original)} √"
-                )
-
-            show_download(
-                "下载半顺以上",
-                half_or_more,
-                f"半顺以上_{len(half_or_more)}注.txt",
-                "sequence_all_dl"
-            )
-
-            show_download(
-                "单独下载半顺",
-                half,
-                f"半顺_{len(half)}注.txt",
-                "sequence_half_dl"
-            )
-
-            show_download(
-                "单独下载全顺",
-                full,
-                f"全顺_{len(full)}注.txt",
-                "sequence_full_dl"
-            )
-
-            show_download(
-                "下载非半顺以上",
-                non,
-                f"非半顺以上_{len(non)}注.txt",
-                "sequence_non_dl"
-            )
+            st.write(f"原始：**{len(d['o'])} 注**"); st.write(f"半顺：**{len(d['half'])} 注**"); st.write(f"全顺：**{len(d['full'])} 注**"); st.write(f"半顺以上：**{len(d['hm'])} 注**"); st.write(f"非半顺以上：**{len(d['non'])} 注**"); st.success(f"分类闭环1：{len(d['half'])}+{len(d['full'])}={len(d['hm'])} √"); st.success(f"分类闭环2：{len(d['hm'])}+{len(d['non'])}={len(d['o'])} √")
+            for label,arr,k in [("下载半顺以上",d["hm"],"s1"),("单独下载半顺",d["half"],"s2"),("单独下载全顺",d["full"],"s3"),("下载非半顺以上",d["non"],"s4")]: show_download(label,arr,f"{label.replace('下载','')}_{len(arr)}注.txt",k)
