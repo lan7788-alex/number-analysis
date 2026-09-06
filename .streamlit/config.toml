@@ -1,0 +1,3 @@
+[server]
+websocketPingInterval = 15
+enableWebsocketCompression = false
