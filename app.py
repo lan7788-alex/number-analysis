@@ -69,6 +69,25 @@ def run_koujing1(mother,size_pos,parity_pos):
     diff=[n for n in full if repeat_type(n)=="三不同"]
     return {"mother_size":ms,"mother_parity":mp,"allowed_size":asize,"allowed_parity":apar,"full":sorted(full),"same23":sorted(same),"different":sorted(diff)}
 
+
+def normal_allowed_shapes(mother_shape, position_name, all_shapes):
+    """口径1正常取号：保留母号自身一侧，去掉指定两位均与母号相反的2个形态。"""
+    opposite={"大":"小","小":"大","奇":"偶","偶":"奇"}
+    pos=POSITION_MAP[position_name]
+    return [
+        s for s in all_shapes
+        if not all(s[p]==opposite[mother_shape[p]] for p in pos)
+    ]
+
+def run_koujing1_normal(mother,size_pos,parity_pos):
+    ms,mp=size_shape(mother),parity_shape(mother)
+    asize=normal_allowed_shapes(ms,size_pos,SIZE_SHAPES)
+    apar=normal_allowed_shapes(mp,parity_pos,PARITY_SHAPES)
+    full=[n for n in ALL_NUMBERS if size_shape(n) in asize and parity_shape(n) in apar]
+    same=[n for n in full if repeat_type(n)!="三不同"]
+    diff=[n for n in full if repeat_type(n)=="三不同"]
+    return {"mother_size":ms,"mother_parity":mp,"allowed_size":asize,"allowed_parity":apar,"full":sorted(full),"same23":sorted(same),"different":sorted(diff)}
+
 def run_shape_koujing1(size_mother_shape,size_pos,parity_mother_shape,parity_pos):
     # 与口径1完全同一套“八形态反筛法”。
     # 唯一区别：不再从三位数字推导母号形态，而是直接由用户指定大小母形态和奇偶母形态。
@@ -175,7 +194,7 @@ if mode=="口径1取号":
         for line in [x.strip() for x in text.splitlines() if x.strip()]:
             p,e=parse_koujing1(line)
             if e: errs.append(f"{line}：{e}"); continue
-            items.append((p,run_koujing1(p["mother"],p["size_pos"],p["parity_pos"])))
+            items.append((p,run_koujing1_normal(p["mother"],p["size_pos"],p["parity_pos"])))
         save_result(mode,{"items":items,"errs":errs})
     data=get_result(mode)
     if data:
